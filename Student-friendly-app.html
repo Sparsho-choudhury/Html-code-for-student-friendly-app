@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyScript — Personal Handwriting Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Lora:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1209;
+    --paper: #fdf8f0;
+    --paper-warm: #f5eed8;
+    --ruled-line: #aac4e0;
+    --ruled-margin: #f09090;
+    --accent: #c8522a;
+    --accent2: #2a6e8a;
+    --gold: #c8972a;
+    --ui-bg: #1c1814;
+    --ui-surface: #2a2420;
+    --ui-border: #3d342c;
+    --ui-text: #e8dfd0;
+    --ui-muted: #8a7a6a;
+    --captured: #2d6b3a;
+    --captured-bg: #e8f5ec;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Lora', Georgia, serif;
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.8rem;
+    color: var(--gold);
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); font-style: normal; }
+  .progress-summary {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--ui-muted);
+  }
+  .progress-bar-outer {
+    width: 160px; height: 6px;
+    background: var(--ui-border);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-bar-inner {
+    height: 100%; background: linear-gradient(90deg, var(--accent2), var(--gold));
+    border-radius: 3px; transition: width 0.4s ease;
+    width: 0%;
+  }
+  .tab-nav {
+    display: flex; gap: 4px;
+  }
+  .tab-btn {
+    padding: 8px 18px;
+    border: 1px solid var(--ui-border);
+    background: transparent;
+    color: var(--ui-muted);
+    font-family: 'Lora', serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main { display: flex; min-height: calc(100vh - 61px); }
+
+  /* ── PANELS ── */
+  .panel { display: none; flex: 1; }
+  .panel.active { display: flex; }
+
+  /* ── CAPTURE PANEL ── */
+  #panel-capture {
+    flex-direction: column;
+    padding: 28px 32px;
+    gap: 24px;
+  }
+  .capture-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+  }
+  .capture-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    color: var(--ui-text);
+  }
+  .capture-title small {
+    display: block;
+    font-family: 'Lora', serif;
+    font-size: 0.82rem;
+    color: var(--ui-muted);
+    font-weight: normal;
+    margin-top: 4px;
+  }
+
+  /* Character grid */
+  .char-grid-section { }
+  .char-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ui-muted);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .char-grid {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 20px;
+  }
+  .char-chip {
+    width: 42px; height: 42px;
+    border: 1.5px solid var(--ui-border);
+    border-radius: 6px;
+    background: var(--ui-surface);
+    color: var(--ui-muted);
+    font-size: 1rem;
+    font-family: 'Playfair Display', serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .char-chip:hover { border-color: var(--gold); color: var(--gold); transform: scale(1.05); }
+  .char-chip.active { border-color: var(--accent); color: white; background: var(--accent); }
+  .char-chip.captured {
+    border-color: var(--captured);
+    background: transparent;
+  }
+  .char-chip.captured canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0.85;
+  }
+
+  /* Drawing area */
+  .drawing-area {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .canvas-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .canvas-label {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 5rem;
+    color: rgba(200,180,140,0.12);
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    user-select: none;
+  }
+  #draw-canvas {
+    background: #fff9f0;
+    border: 2px solid var(--ui-border);
+    border-radius: 10px;
+    cursor: crosshair;
+    touch-action: none;
+    display: block;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  .canvas-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ui-muted);
+  }
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Lora', serif;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #b04520; }
+  .btn-secondary { background: var(--ui-border); color: var(--ui-text); }
+  .btn-secondary:hover { background: #4d423a; }
+  .btn-success { background: var(--captured); color: white; }
+  .btn-success:hover { background: #235530; }
+  .btn-ghost { background: transparent; border: 1px solid var(--ui-border); color: var(--ui-muted); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--ui-border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .color-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s;
+  }
+  .swatch.active, .swatch:hover { transform: scale(1.2); border-color: white; }
+
+  .nav-arrows { display: flex; gap: 8px; }
+
+  /* ── GENERATE PANEL ── */
+  #panel-generate {
+    flex-direction: column;
+    padding: 28px 32px;
+    gap: 24px;
+  }
+  .gen-layout {
+    display: flex;
+    gap: 28px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+  .gen-sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .gen-main { flex: 1; min-width: 300px; }
+
+  .sidebar-section {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .sidebar-section h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    margin-bottom: 14px;
+    color: var(--gold);
+  }
+
+  textarea#text-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    background: #1a150f;
+    border: 1px solid var(--ui-border);
+    border-radius: 8px;
+    color: var(--ui-text);
+    font-family: 'Lora', serif;
+    font-size: 0.95rem;
+    resize: vertical;
+    outline: none;
+  }
+  textarea#text-input:focus { border-color: var(--gold); }
+
+  .paper-style-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .paper-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--ui-border);
+    background: transparent;
+    color: var(--ui-muted);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-family: 'Lora', serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .paper-btn.active, .paper-btn:hover {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(42,110,138,0.1);
+  }
+
+  .ink-color-options { display: flex; gap: 10px; flex-wrap: wrap; }
+  .ink-opt {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--ui-border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--ui-muted);
+    transition: all 0.2s;
+  }
+  .ink-opt.active, .ink-opt:hover { border-color: var(--gold); color: var(--ui-text); }
+  .ink-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  select {
+    width: 100%;
+    padding: 8px 10px;
+    background: #1a150f;
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    color: var(--ui-text);
+    font-family: 'Lora', serif;
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+  }
+  select:focus { border-color: var(--gold); }
+
+  /* Paper output */
+  #paper-output {
+    background: var(--paper);
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.1);
+    overflow: hidden;
+    position: relative;
+    min-height: 500px;
+    width: 100%;
+  }
+  #paper-canvas { display: block; width: 100%; }
+
+  .export-bar {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--ui-border);
+  }
+  .export-bar span {
+    font-size: 0.8rem;
+    color: var(--ui-muted);
+    margin-right: auto;
+  }
+
+  /* ── PROGRESS CHIPS ── */
+  .captured-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--captured);
+    margin-top: 4px;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-left: 3px solid var(--gold);
+    color: var(--ui-text);
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-family: 'Lora', serif;
+    z-index: 9999;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.3s;
+    max-width: 300px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── EMPTY PAPER HINT ── */
+  .paper-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #b0a090;
+    pointer-events: none;
+  }
+  .paper-hint .hint-icon { font-size: 2.5rem; }
+  .paper-hint p { font-family: 'Lora', serif; font-style: italic; font-size: 0.95rem; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+    #panel-capture, #panel-generate { padding: 16px; }
+    .gen-sidebar { width: 100%; }
+    .drawing-area { flex-direction: column; }
+  }
+
+  /* ── ABOUT badge ── */
+  .uncaptured-warning {
+    background: rgba(200,82,42,0.12);
+    border: 1px solid rgba(200,82,42,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #e8a07a;
+    display: none;
+  }
+  .uncaptured-warning.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">My<span>Script</span></div>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('capture')">✍️ Capture</button>
+    <button class="tab-btn" onclick="switchTab('generate')">🔤 Generate</button>
+  </div>
+  <div class="progress-summary">
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="prog-bar"></div>
+    </div>
+    <span id="prog-label">0 / 36</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══ CAPTURE PANEL ══ -->
+  <div id="panel-capture" class="panel active">
+    <div class="capture-header">
+      <div class="capture-title">
+        Handwriting Studio
+        <small>Draw each character in your natural handwriting style to build your font.</small>
+      </div>
+      <div class="nav-arrows">
+        <button class="btn btn-ghost" onclick="prevChar()">← Prev</button>
+        <button class="btn btn-ghost" onclick="nextChar()">Next →</button>
+      </div>
+    </div>
+
+    <div class="char-grid-section">
+      <div class="char-group-label">Letters A–Z</div>
+      <div class="char-grid" id="grid-letters"></div>
+      <div class="char-group-label">Numbers 0–9</div>
+      <div class="char-grid" id="grid-numbers"></div>
+      <div class="captured-count" id="captured-count">0 of 36 characters captured</div>
+    </div>
+
+    <div class="drawing-area">
+      <div class="canvas-wrapper">
+        <div class="canvas-label" id="canvas-label-bg">A</div>
+        <canvas id="draw-canvas" width="280" height="280"></canvas>
+      </div>
+
+      <div class="canvas-controls">
+        <div class="ctrl-group">
+          <div class="ctrl-label">Current character</div>
+          <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--gold)" id="current-char-display">A</div>
+        </div>
+
+        <div class="ctrl-group">
+          <div class="ctrl-label">Brush size</div>
+          <input type="range" id="brush-size" min="1" max="12" value="3">
+        </div>
+
+        <div class="ctrl-group">
+          <div class="ctrl-label">Ink color</div>
+          <div class="color-swatches">
+            <div class="swatch active" style="background:#1a1209" data-color="#1a1209" onclick="setColor(this)"></div>
+            <div class="swatch" style="background:#1a3a6e" data-color="#1a3a6e" onclick="setColor(this)"></div>
+            <div class="swatch" style="background:#2d6b3a" data-color="#2d6b3a" onclick="setColor(this)"></div>
+            <div class="swatch" style="background:#8b0000" data-color="#8b0000" onclick="setColor(this)"></div>
+            <div class="swatch" style="background:#4a4a4a" data-color="#4a4a4a" onclick="setColor(this)"></div>
+          </div>
+        </div>
+
+        <div class="ctrl-group" style="display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-secondary" onclick="clearCanvas()">🗑 Clear</button>
+          <button class="btn btn-success" onclick="saveChar()">✓ Save</button>
+        </div>
+        <div class="ctrl-group">
+          <button class="btn btn-primary" onclick="nextChar()" style="width:100%">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GENERATE PANEL ══ -->
+  <div id="panel-generate" class="panel">
+    <div class="uncaptured-warning" id="warning-box">
+      ⚠️ You haven't captured all characters yet. Missing characters will be rendered with a placeholder. Head to <b>Capture</b> to complete your handwriting set.
+    </div>
+
+    <div class="gen-layout">
+      <div class="gen-sidebar">
+
+        <div class="sidebar-section">
+          <h3>✍️ Your Text</h3>
+          <textarea id="text-input" placeholder="Type anything here...&#10;It will appear in your handwriting!" rows="5"></textarea>
+          <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="renderHandwriting()">Generate ✨</button>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>📄 Paper Style</h3>
+          <div class="paper-style-btns">
+            <button class="paper-btn active" data-style="single" onclick="setPaper(this)">Single ruled</button>
+            <button class="paper-btn" data-style="double" onclick="setPaper(this)">Double ruled</button>
+            <button class="paper-btn" data-style="graph" onclick="setPaper(this)">Graph</button>
+            <button class="paper-btn" data-style="blank" onclick="setPaper(this)">Blank</button>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>🎨 Customization</h3>
+          <div class="ctrl-group" style="margin-bottom:12px">
+            <div class="ctrl-label">Ink color</div>
+            <div class="ink-color-options">
+              <div class="ink-opt active" data-ink="#1a1209" onclick="setInk(this)"><div class="ink-dot" style="background:#1a1209"></div>Black</div>
+              <div class="ink-opt" data-ink="#1a3a6e" onclick="setInk(this)"><div class="ink-dot" style="background:#1a3a6e"></div>Blue</div>
+              <div class="ink-opt" data-ink="#8b0000" onclick="setInk(this)"><div class="ink-dot" style="background:#8b0000"></div>Red</div>
+              <div class="ink-opt" data-ink="#2d6b3a" onclick="setInk(this)"><div class="ink-dot" style="background:#2d6b3a"></div>Green</div>
+            </div>
+          </div>
+          <div class="ctrl-group" style="margin-bottom:12px">
+            <div class="ctrl-label">Character size: <span id="size-val">48</span>px</div>
+            <input type="range" id="char-size" min="24" max="80" value="48" oninput="document.getElementById('size-val').textContent=this.value">
+          </div>
+          <div class="ctrl-group" style="margin-bottom:12px">
+            <div class="ctrl-label">Line spacing: <span id="spacing-val">72</span>px</div>
+            <input type="range" id="line-spacing" min="48" max="120" value="72" oninput="document.getElementById('spacing-val').textContent=this.value">
+          </div>
+          <div class="ctrl-group">
+            <div class="ctrl-label">Letter spacing: <span id="letter-val">4</span>px</div>
+            <input type="range" id="letter-spacing" min="-4" max="20" value="4" oninput="document.getElementById('letter-val').textContent=this.value">
+          </div>
+        </div>
+
+      </div>
+
+      <div class="gen-main">
+        <div id="paper-output">
+          <div class="paper-hint" id="paper-hint">
+            <div class="hint-icon">📝</div>
+            <p>Type your text and click Generate</p>
+          </div>
+          <canvas id="paper-canvas"></canvas>
+        </div>
+
+        <div class="export-bar">
+          <span id="export-info">Generate text to enable export</span>
+          <button class="btn btn-secondary" onclick="exportPNG()">⬇ Download PNG</button>
+          <button class="btn btn-primary" onclick="exportPDF()">📑 Export PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+const glyphs = {}; // char -> ImageData or dataURL
+let currentChar = 'A';
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let brushColor = '#1a1209';
+let paperStyle = 'single';
+let inkColor = '#1a1209';
+let hasGenerated = false;
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+const drawCanvas = document.getElementById('draw-canvas');
+const ctx = drawCanvas.getContext('2d');
+
+function buildGrid() {
+  const letters = CHARS.slice(0, 26);
+  const numbers = CHARS.slice(26);
+
+  const gl = document.getElementById('grid-letters');
+  const gn = document.getElementById('grid-numbers');
+
+  letters.forEach(c => gl.appendChild(makeChip(c)));
+  numbers.forEach(c => gn.appendChild(makeChip(c)));
+}
+
+function makeChip(c) {
+  const div = document.createElement('div');
+  div.className = 'char-chip';
+  div.id = `chip-${c}`;
+  div.textContent = c;
+  div.onclick = () => selectChar(c);
+  return div;
+}
+
+function selectChar(c) {
+  currentChar = c;
+  document.getElementById('current-char-display').textContent = c;
+  document.getElementById('canvas-label-bg').textContent = c;
+  document.querySelectorAll('.char-chip').forEach(el => el.classList.remove('active'));
+  const chip = document.getElementById(`chip-${c}`);
+  if (chip) chip.classList.add('active');
+
+  // If already captured, show it on canvas
+  clearCanvas(false);
+  if (glyphs[c]) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+      ctx.drawImage(img,0,0,drawCanvas.width,drawCanvas.height);
+    };
+    img.src = glyphs[c];
+  }
+}
+
+function clearCanvas(andGlyph = false) {
+  ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  if (andGlyph && glyphs[currentChar]) {
+    delete glyphs[currentChar];
+    updateChip(currentChar, false);
+    updateProgress();
+  }
+}
+
+function saveChar() {
+  const blank = isCanvasBlank();
+  if (blank) { showToast('Please draw the character first'); return; }
+  glyphs[currentChar] = drawCanvas.toDataURL();
+  updateChip(currentChar, true);
+  updateProgress();
+  showToast(`"${currentChar}" saved! ✓`);
+  nextChar();
+}
+
+function isCanvasBlank() {
+  const d = ctx.getImageData(0,0,drawCanvas.width,drawCanvas.height).data;
+  for (let i=3;i<d.length;i+=4) if(d[i]>10) return false;
+  return true;
+}
+
+function updateChip(c, captured) {
+  const chip = document.getElementById(`chip-${c}`);
+  if (!chip) return;
+  if (captured) {
+    chip.classList.add('captured');
+    chip.classList.remove('active');
+    // Draw tiny preview
+    let cv = chip.querySelector('canvas');
+    if (!cv) { cv = document.createElement('canvas'); cv.width=42; cv.height=42; chip.appendChild(cv); }
+    const cx = cv.getContext('2d');
+    const img = new Image();
+    img.onload = () => { cx.clearRect(0,0,42,42); cx.drawImage(img,0,0,42,42); };
+    img.src = glyphs[c];
+    chip.textContent = '';
+    chip.appendChild(cv);
+  } else {
+    chip.classList.remove('captured');
+    chip.innerHTML = c;
+  }
+}
+
+function updateProgress() {
+  const n = Object.keys(glyphs).length;
+  const pct = (n/36)*100;
+  document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('prog-label').textContent = `${n} / 36`;
+  document.getElementById('captured-count').textContent = `${n} of 36 characters captured`;
+}
+
+function nextChar() {
+  const idx = CHARS.indexOf(currentChar);
+  selectChar(CHARS[(idx+1) % CHARS.length]);
+}
+function prevChar() {
+  const idx = CHARS.indexOf(currentChar);
+  selectChar(CHARS[(idx-1+CHARS.length) % CHARS.length]);
+}
+
+// ═══════════════════════════════════════
+//  DRAWING
+// ═══════════════════════════════════════
+function getPos(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  const scaleX = drawCanvas.width / r.width;
+  const scaleY = drawCanvas.height / r.height;
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX - r.left)*scaleX, (src.clientY - r.top)*scaleY];
+}
+
+drawCanvas.addEventListener('mousedown', e => {
+  isDrawing = true;
+  [lastX, lastY] = getPos(e);
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, parseInt(document.getElementById('brush-size').value)/2, 0, Math.PI*2);
+  ctx.fillStyle = brushColor;
+  ctx.fill();
+});
+
+drawCanvas.addEventListener('mousemove', e => {
+  if (!isDrawing) return;
+  const [x, y] = getPos(e);
+  const size = parseInt(document.getElementById('brush-size').value);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = brushColor;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  [lastX, lastY] = [x, y];
+});
+
+drawCanvas.addEventListener('mouseup', () => isDrawing = false);
+drawCanvas.addEventListener('mouseleave', () => isDrawing = false);
+
+drawCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  isDrawing = true;
+  [lastX, lastY] = getPos(e);
+});
+drawCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const [x, y] = getPos(e);
+  const size = parseInt(document.getElementById('brush-size').value);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = brushColor;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  [lastX, lastY] = [x, y];
+});
+drawCanvas.addEventListener('touchend', () => isDrawing = false);
+
+function setColor(el) {
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  brushColor = el.dataset.color;
+}
+
+// ═══════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+  if (tab === 'generate') {
+    const n = Object.keys(glyphs).length;
+    const w = document.getElementById('warning-box');
+    w.classList.toggle('show', n < 36);
+  }
+}
+
+// ═══════════════════════════════════════
+//  PAPER GENERATION
+// ═══════════════════════════════════════
+function setPaper(el) {
+  document.querySelectorAll('.paper-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  paperStyle = el.dataset.style;
+}
+
+function setInk(el) {
+  document.querySelectorAll('.ink-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  inkColor = el.dataset.ink;
+}
+
+async function renderHandwriting() {
+  const text = document.getElementById('text-input').value.trim();
+  if (!text) { showToast('Please enter some text first'); return; }
+
+  const PAPER_W = 800;
+  const MARGIN_LEFT = 60;
+  const MARGIN_RIGHT = 40;
+  const MARGIN_TOP = 50;
+  const charSz = parseInt(document.getElementById('char-size').value);
+  const lineSpacing = parseInt(document.getElementById('line-spacing').value);
+  const letterSpacing = parseInt(document.getElementById('letter-spacing').value);
+
+  // Word-wrap
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  const usableW = PAPER_W - MARGIN_LEFT - MARGIN_RIGHT;
+  const avgCW = charSz * 0.62 + letterSpacing;
+
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (test.length * avgCW > usableW && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+
+  // Also split on explicit newlines
+  const finalLines = [];
+  for (const l of lines) finalLines.push(...l.split('\n'));
+
+  const PAPER_H = Math.max(600, MARGIN_TOP + (finalLines.length + 1) * lineSpacing + 60);
+
+  const pc = document.getElementById('paper-canvas');
+  pc.width = PAPER_W;
+  pc.height = PAPER_H;
+  const pctx = pc.getContext('2d');
+
+  // Paper background
+  pctx.fillStyle = '#fdf8f0';
+  pctx.fillRect(0, 0, PAPER_W, PAPER_H);
+
+  // Subtle texture
+  for (let i=0; i<PAPER_W*PAPER_H*0.003; i++) {
+    const x = Math.random()*PAPER_W;
+    const y = Math.random()*PAPER_H;
+    pctx.fillStyle = `rgba(0,0,0,${Math.random()*0.03})`;
+    pctx.fillRect(x, y, 1, 1);
+  }
+
+  // Draw ruled lines
+  drawPaperLines(pctx, PAPER_W, PAPER_H, MARGIN_TOP, lineSpacing, MARGIN_LEFT);
+
+  // Load all needed glyph images first
+  const needed = new Set(text.toUpperCase().replace(/[^A-Z0-9]/g, '').split(''));
+  const imgs = {};
+  await Promise.all([...needed].map(c => new Promise(res => {
+    if (!glyphs[c]) { res(); return; }
+    const img = new Image();
+    img.onload = () => { imgs[c] = img; res(); };
+    img.onerror = res;
+    img.src = glyphs[c];
+  })));
+
+  // Render text line by line
+  for (let li = 0; li < finalLines.length; li++) {
+    const lineText = finalLines[li];
+    const baseY = MARGIN_TOP + (li + 1) * lineSpacing;
+    let x = MARGIN_LEFT;
+
+    for (let ci = 0; ci < lineText.length; ci++) {
+      const ch = lineText[ci];
+      if (ch === ' ') { x += charSz * 0.45; continue; }
+      const uc = ch.toUpperCase();
+
+      if (imgs[uc]) {
+        const cw = charSz * 0.7;
+        const ch_h = charSz;
+        // Slight vertical jitter for natural look
+        const jitter = (Math.random() - 0.5) * 2;
+        const rot = (Math.random() - 0.5) * 0.04;
+
+        pctx.save();
+        pctx.translate(x + cw/2, baseY - ch_h/2);
+        pctx.rotate(rot);
+
+        // Tint to ink color
+        const tempC = document.createElement('canvas');
+        tempC.width = 280; tempC.height = 280;
+        const tctx = tempC.getContext('2d');
+        tctx.drawImage(imgs[uc], 0, 0, 280, 280);
+
+        // Colorize
+        tctx.globalCompositeOperation = 'source-in';
+        tctx.fillStyle = inkColor;
+        tctx.fillRect(0,0,280,280);
+
+        pctx.drawImage(tempC, -cw/2, -ch_h/2 + jitter, cw, ch_h);
+        pctx.restore();
+        x += cw + letterSpacing;
+      } else {
+        // Placeholder for uncaptured chars
+        pctx.save();
+        pctx.font = `${charSz * 0.7}px 'Lora', serif`;
+        pctx.fillStyle = inkColor + '55';
+        pctx.fillText(ch, x, baseY);
+        pctx.restore();
+        x += pctx.measureText(ch).width + letterSpacing;
+      }
+    }
+  }
+
+  document.getElementById('paper-hint').style.display = 'none';
+  hasGenerated = true;
+  document.getElementById('export-info').textContent = `Generated ${finalLines.length} line${finalLines.length!==1?'s':''} on ${PAPER_W}×${PAPER_H}px paper`;
+  showToast('Handwriting generated! ✨');
+}
+
+function drawPaperLines(ctx, W, H, marginTop, lineSpacing, marginLeft) {
+  if (paperStyle === 'blank') return;
+
+  if (paperStyle === 'graph') {
+    const grid = lineSpacing / 3;
+    ctx.strokeStyle = '#aac4e066';
+    ctx.lineWidth = 0.5;
+    for (let y = 0; y < H; y += grid) {
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    for (let x = 0; x < W; x += grid) {
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    return;
+  }
+
+  ctx.strokeStyle = '#aac4e0';
+  ctx.lineWidth = 0.8;
+  for (let y = marginTop + lineSpacing; y < H - 20; y += lineSpacing) {
+    ctx.beginPath(); ctx.moveTo(marginLeft - 20, y); ctx.lineTo(W - 20, y); ctx.stroke();
+    if (paperStyle === 'double') {
+      ctx.beginPath(); ctx.moveTo(marginLeft - 20, y - 8); ctx.lineTo(W - 20, y - 8); ctx.stroke();
+    }
+  }
+
+  // Margin line
+  ctx.strokeStyle = '#f09090';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(marginLeft - 4, 0); ctx.lineTo(marginLeft - 4, H); ctx.stroke();
+
+  // Hole punches
+  [H*0.2, H*0.5, H*0.8].forEach(y => {
+    ctx.beginPath();
+    ctx.arc(16, y, 8, 0, Math.PI*2);
+    ctx.strokeStyle = '#c8b89088';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#e8dfd0';
+    ctx.fill();
+  });
+}
+
+// ═══════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════
+function exportPNG() {
+  if (!hasGenerated) { showToast('Generate handwriting first'); return; }
+  const pc = document.getElementById('paper-canvas');
+  const link = document.createElement('a');
+  link.download = 'myscript_handwriting.png';
+  link.href = pc.toDataURL('image/png');
+  link.click();
+  showToast('PNG downloaded! 📷');
+}
+
+function exportPDF() {
+  if (!hasGenerated) { showToast('Generate handwriting first'); return; }
+  const pc = document.getElementById('paper-canvas');
+  const dataURL = pc.toDataURL('image/png');
+
+  // Simple PDF using data URI approach with jsPDF-like manual construction
+  const W = pc.width;
+  const H = pc.height;
+
+  // Use a minimal PDF approach via window.open and print
+  const win = window.open('', '_blank');
+  if (!win) { showToast('Allow popups to export PDF'); return; }
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>MyScript Export</title>
+      <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background: white; }
+        img { width:100%; display:block; }
+        @media print {
+          body { margin: 0; }
+          img { page-break-inside: avoid; }
+        }
+      </style>
+    </head>
+    <body>
+      <img src="${dataURL}">
+      <script>
+        window.onload = function() {
+          setTimeout(() => { window.print(); }, 300);
+        };
+      <\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  showToast('Opening print dialog for PDF export');
+}
+
+// ═══════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════
+let toastTimeout;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+buildGrid();
+selectChar('A');
+
+// Keyboard shortcut: Enter = save, arrows = navigate
+document.addEventListener('keydown', e => {
+  const panel = document.getElementById('panel-capture');
+  if (!panel.classList.contains('active')) return;
+  if (e.key === 'ArrowRight') nextChar();
+  if (e.key === 'ArrowLeft') prevChar();
+  if (e.key === 'Enter') saveChar();
+  if (e.key === 'Escape') clearCanvas(false);
+});
+</script>
+</body>
+</html>
